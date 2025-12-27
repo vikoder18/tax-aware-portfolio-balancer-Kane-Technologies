@@ -16,6 +16,13 @@ public class BalancingEngine {
         BigDecimal totalRealizedGainLoss = BigDecimal.ZERO;
         LocalDate today = LocalDate.now();
 
+        if (portfolio == null || portfolio.getHoldingList().isEmpty()) {
+            throw new IllegalArgumentException("Portfolio cannot be null or empty");
+        }
+        if (prices == null || prices.isEmpty()) {
+            throw new IllegalArgumentException("Market prices are missing");
+        }
+
         BigDecimal totalPortfolioValue = calculateTotalPortfolioValue(portfolio, prices);
         Map<Assets, BigDecimal> currentClassValues = calculateAssetClassValues(portfolio, prices);
 
@@ -26,6 +33,10 @@ public class BalancingEngine {
 
             BigDecimal currentValue = currentClassValues.get(assetClass);
             BigDecimal currentPercentage = currentValue.divide(totalPortfolioValue, 6, RoundingMode.HALF_UP);
+
+            if (allocateTargets == null) {
+                throw new IllegalArgumentException("Target allocation is required");
+            }
 
             BigDecimal targetPercentage = allocateTargets.getTargetFor(assetClass);
 
@@ -54,11 +65,13 @@ public class BalancingEngine {
                 continue;
             }
             BigDecimal price = prices.get(holding.getAssetId());
+            if (price == null) {
+                throw new IllegalStateException("Missing market price for asset: " + holding.getAssetId());
+            }
             PriorityQueue<TaxLots> queue = queueBuilder.buildQueue(holding.getTaxLots(), price, today);
 
             while (!queue.isEmpty() && amountToSell.compareTo(BigDecimal.ZERO) > 0) {
                 TaxLots lot = queue.poll();
-
                 BigDecimal lotMarketValue = lot.marketValue(price);
                 BigDecimal sellValue = lotMarketValue.min(amountToSell);
                 BigDecimal unitsToSell = sellValue.divide(price, 6, RoundingMode.HALF_UP);
